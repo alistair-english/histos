@@ -6,15 +6,8 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi",
-    "httpx",
-    "httpx-sse",
-    "platformdirs",
-    "portalocker",
-    "pydantic-settings",
-    "rich",
-    "sse-starlette",
     "typer",
-    "uvicorn[standard]",
+    "uvicorn",
 ]
 
 [dependency-groups]
@@ -22,7 +15,6 @@ dev = [
     "pre-commit>=4.7.0",
     "pyright",
     "pytest",
-    "pytest-asyncio",
     "ruff",
 ]
 
@@ -40,7 +32,7 @@ typeCheckingMode = "strict"
 
 [tool.pytest.ini_options]
 addopts = "-q"
-asyncio_mode = "auto"
+
 [tool.ruff]
 line-length = 120
 target-version = "py312"

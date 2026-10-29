@@ -45,20 +45,13 @@ These choices are not final. Dependencies were added to establish a usable proje
 
 ### Current Python dependencies
 
-The current manifest includes:
+The current runtime manifest is intentionally minimal and includes:
 
 - FastAPI
-- Uvicorn
-- Pydantic Settings
 - Typer
-- HTTPX
-- HTTPX SSE
-- SSE Starlette
-- Platformdirs
-- Portalocker
-- Rich
+- Uvicorn
 
-No model-provider SDK is installed.
+Provider HTTP/SSE clients, server-side SSE helpers, settings management, platform-directory helpers, and file-locking libraries should be added only when implemented code requires them. No model-provider SDK is installed.
 
 ## Local process architecture discussed
 
