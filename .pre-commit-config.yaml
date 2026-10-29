@@ -1,0 +1,30 @@
+repos:
+  - repo: local
+    hooks:
+      - id: ruff
+        name: Ruff
+        entry: uv run ruff check .
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: pyright
+        name: Pyright
+        entry: uv run pyright
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: frontend-typescript
+        name: Frontend TypeScript
+        entry: npm run check --prefix frontend
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: frontend-eslint
+        name: Frontend ESLint
+        entry: npm run lint --prefix frontend
+        language: system
+        pass_filenames: false
+        always_run: true

@@ -14,13 +14,13 @@ A local, graph-based interface for language models.
 ```bash
 uv sync
 npm install --prefix frontend
+uv run pre-commit install
 ```
 
 ## Project checks
 
+All checks run automatically before each commit. Run them manually with:
+
 ```bash
-uv run ruff check .
-uv run pyright
-npm run check --prefix frontend
-npm run lint --prefix frontend
+uv run pre-commit run --all-files
 ```
