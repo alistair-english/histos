@@ -24,3 +24,9 @@ All checks run automatically before each commit. Run them manually with:
 ```bash
 uv run pre-commit run --all-files
 ```
+
+Ruff formats staged Python files during commits. If it changes a file, stage the result and commit again. To format manually:
+
+```bash
+uv run ruff format .
+```
