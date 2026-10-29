@@ -17,6 +17,32 @@ npm install --prefix frontend
 uv run pre-commit install
 ```
 
+## Run the prototype
+
+Sign in with the ChatGPT account that has your Codex subscription:
+
+```bash
+uv run histos login
+```
+
+For development, run the API and frontend in separate terminals:
+
+```bash
+uv run histos serve
+npm run --prefix frontend dev
+```
+
+Open <http://127.0.0.1:5173>. Graph state is stored in `.histos/graph.json`.
+
+To run the built single-server version:
+
+```bash
+npm run --prefix frontend build
+uv run histos serve
+```
+
+Open <http://127.0.0.1:8000>.
+
 ## Project checks
 
 All checks run automatically before each commit. Run them manually with:

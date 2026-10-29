@@ -14,19 +14,16 @@ This is currently a personal/local project. Easy iteration matters more than pol
 
 ## Current repository state
 
-The repository currently contains project configuration only. There is no backend server, CLI, React application, graph engine, model integration, storage implementation, or OAuth implementation yet.
+The repository now contains a minimal end-to-end prototype:
 
-Current top-level shape:
+- a `histos` CLI with `login` and `serve` commands;
+- a FastAPI backend scoped to one working directory;
+- plaintext graph persistence at `.histos/graph.json`;
+- APIs for reading, resetting, and appending to the graph, plus requesting a model response;
+- a React Flow UI for creating, selecting, displaying, and confirmation-gated resetting of entries;
+- a Codex integration that starts a fresh ephemeral thread for each response and exposes `add_concept` and `ask_question` as dynamic graph-writing tools. Its current prompt asks for singular high-level concepts with explanations and details represented as nested sub-concepts rather than flat, multi-topic entries.
 
-```text
-frontend/             React/TypeScript project configuration
-src/histos/           Installable Python package
-CONTEXT.md             This provisional handoff document
-pyproject.toml         Python project and tool configuration
-uv.lock                Locked Python dependencies
-```
-
-The frontend has Vite configuration and a Vite type declaration, but no application entry point or UI implementation.
+The prototype is deliberately narrow. It has one graph per workspace, fixed development ports, no streaming, no full graph editing, and no working tools beyond graph-writing control operations. Subscription login and a real Codex response using the dynamic graph-writing tools have been verified end to end.
 
 ## Provisional technology direction
 
@@ -45,13 +42,14 @@ These choices are not final. Dependencies were added to establish a usable proje
 
 ### Current Python dependencies
 
-The current runtime manifest is intentionally minimal and includes:
+The current runtime manifest includes:
 
 - FastAPI
-- Typer
-- Uvicorn
+- the official Python Codex SDK (`openai-codex`), including its pinned app-server runtime;
+- Typer;
+- Uvicorn.
 
-Provider HTTP/SSE clients, server-side SSE helpers, settings management, platform-directory helpers, and file-locking libraries should be added only when implemented code requires them. No model-provider SDK is installed.
+The Codex SDK reuses Codex authentication, allowing the prototype to use an eligible ChatGPT/Codex subscription rather than a separately billed OpenAI API key. Provider abstraction, SSE helpers, settings management, platform-directory helpers, and cross-process file locking remain deferred.
 
 ## Local process architecture discussed
 
@@ -231,18 +229,14 @@ Generated lockfiles are excluded from Prettier.
 
 ## Suggested immediate next milestone
 
-The next milestone discussed was the smallest possible backend lifecycle slice:
+The basic vertical slice is implemented. The next milestone should be using it with real Codex responses and tightening behavior based on observed failures. Likely first targets are:
 
-1. Add a `histos` CLI entry point.
-2. Resolve the canonical current working directory.
-3. Start FastAPI on `127.0.0.1` using an available port.
-4. Print the local URL.
-5. Add a minimal health endpoint reporting the workspace.
-6. Shut down cleanly on Ctrl-C.
+1. Use several real conversations to identify graph-writing and prompt failures.
+2. Improve tree layout once real responses create multiple branches.
+3. Add visible response progress and cancellation if model latency is disruptive.
+4. Record actual working tool calls as graph entries only after graph-writing behavior is sound.
 
-This would validate packaging, CLI startup, loopback binding, dynamic ports, and workspace scoping before adding persistence, sessions, models, OAuth, or graph behavior.
-
-This milestone is a suggestion, not a committed plan. Reassess it before implementation.
+Dynamic ports, process reuse, multiple sessions, provider abstraction, and full graph editing remain deferred.
 
 ## Guidance for future agents
 

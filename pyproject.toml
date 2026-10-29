@@ -6,12 +6,17 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi",
+    "openai-codex>=0.163.0",
     "typer",
     "uvicorn",
 ]
 
+[project.scripts]
+histos = "histos.cli:app"
+
 [dependency-groups]
 dev = [
+    "httpx>=0.28.1",
     "pre-commit>=4.7.0",
     "pyright",
     "pytest",
@@ -48,6 +53,14 @@ ignore = [
     "D213",
     # The repository has a LICENSE file instead of a header in every source file.
     "CPY001",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+    # Pytest uses plain assertions for introspected failure output.
+    "S101",
+    # Literal expected values make small tests easier to read.
+    "PLR2004",
 ]
 
 [tool.ruff.format]
