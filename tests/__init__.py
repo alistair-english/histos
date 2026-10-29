@@ -1,1 +1,0 @@
-"""Histos test suite."""

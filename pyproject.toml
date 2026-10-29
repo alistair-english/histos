@@ -4,19 +4,10 @@ version = "0.1.0"
 description = "A local, graph-based interface for language models."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = [
-    "fastapi",
-    "openai-codex>=0.163.0",
-    "typer",
-    "uvicorn",
-]
-
-[project.scripts]
-histos = "histos.cli:app"
+dependencies = []
 
 [dependency-groups]
 dev = [
-    "httpx>=0.28.1",
     "pre-commit>=4.7.0",
     "pyright",
     "pytest",

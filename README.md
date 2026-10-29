@@ -1,61 +1,40 @@
 # Histos
 
-A local, graph-based interface for language models.
+Histos is an experiment in graph-based conversations with language models.
 
-## Requirements
+The project is being rebuilt from primitives. The active repository intentionally contains no application implementation yet. Behaviors will be introduced one at a time, with their interfaces and tests, rather than by designing the complete system in advance.
 
-- Python 3.12
-- [uv](https://docs.astral.sh/uv/)
-- Node.js 22
-- npm 10
+See [`DEVELOPMENT.md`](DEVELOPMENT.md) for the working method.
+
+## Prototype reference
+
+The initial end-to-end prototype is preserved in two places:
+
+- Git tag: `prototype-v0`
+- Local reference worktree: `../histos-prototype`
+
+Inspect a prototype file without restoring it:
+
+```bash
+git show prototype-v0:src/histos/graph.py
+```
+
+The prototype is reference material, not the specification for the rebuild.
 
 ## Setup
 
+Requirements:
+
+- Python 3.12
+- [uv](https://docs.astral.sh/uv/)
+
 ```bash
 uv sync
-npm install --prefix frontend
 uv run pre-commit install
 ```
 
-## Run the prototype
-
-Sign in with the ChatGPT account that has your Codex subscription:
-
-```bash
-uv run histos login
-```
-
-For development, run the API and frontend in separate terminals:
-
-```bash
-uv run histos serve
-npm run --prefix frontend dev
-```
-
-Open <http://127.0.0.1:5173>. Graph state is stored in `.histos/graph.json`.
-
-To run the built single-server version:
-
-```bash
-npm run --prefix frontend build
-uv run histos serve
-```
-
-Open <http://127.0.0.1:8000>.
-
-## Project checks
-
-All checks run automatically before each commit. Run them manually with:
+## Checks
 
 ```bash
 uv run pre-commit run --all-files
-```
-
-Ruff and Prettier format staged files during commits. If they change a file, stage the result and commit again.
-
-Format manually with:
-
-```bash
-uv run ruff format .
-npm exec --prefix frontend -- prettier --write .
 ```

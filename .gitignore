@@ -7,14 +7,6 @@ __pycache__/
 .venv/
 dist/
 
-# Node
-node_modules/
-frontend/dist/
-*.tsbuildinfo
-
-# Histos workspace state
-.histos/
-
 # Editors and operating systems
 .DS_Store
 .idea/
