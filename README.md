@@ -25,8 +25,11 @@ All checks run automatically before each commit. Run them manually with:
 uv run pre-commit run --all-files
 ```
 
-Ruff formats staged Python files during commits. If it changes a file, stage the result and commit again. To format manually:
+Ruff and Prettier format staged files during commits. If they change a file, stage the result and commit again.
+
+Format manually with:
 
 ```bash
 uv run ruff format .
+npm exec --prefix frontend -- prettier --write .
 ```

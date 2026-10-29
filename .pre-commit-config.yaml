@@ -21,6 +21,13 @@ repos:
         pass_filenames: false
         always_run: true
 
+      - id: prettier
+        name: Prettier
+        entry: npm exec --prefix frontend -- prettier --write
+        language: system
+        files: \.(cjs|css|html|js|json|jsx|md|mjs|ts|tsx|yaml|yml)$
+        exclude: ^frontend/package-lock\.json$
+
       - id: frontend-typescript
         name: Frontend TypeScript
         entry: npm run check --prefix frontend
