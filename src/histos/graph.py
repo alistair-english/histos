@@ -67,19 +67,18 @@ class Entry:
 
 @dataclass(frozen=True)
 class ParentEdge:
-    """An ordered parent-child relationship between two entries."""
+    """A parent-child relationship between two entries."""
 
     parent_id: EntryId
     child_id: EntryId
-    position: int
 
 
 @dataclass(frozen=True)
 class GraphSnapshot:
     """An immutable external view of a conversation graph."""
 
-    entries: tuple[Entry, ...]
-    edges: tuple[ParentEdge, ...]
+    entries: frozenset[Entry]
+    edges: frozenset[ParentEdge]
 
 
 class GraphError(ValueError):
@@ -109,10 +108,10 @@ type EntryLocator = EntryId | EntryReference
 
 @dataclass(frozen=True)
 class ConversationGraph:
-    """An empty or rooted, ordered conversation graph."""
+    """An empty or rooted conversation graph."""
 
-    _entries: tuple[Entry, ...] = ()
-    _edges: tuple[ParentEdge, ...] = ()
+    _entries: frozenset[Entry] = frozenset()
+    _edges: frozenset[ParentEdge] = frozenset()
 
     def snapshot(self) -> GraphSnapshot:
         """Return the entries and parent edges for projection by a boundary."""
@@ -143,10 +142,9 @@ class ConversationGraph:
         )
         edges = self._edges
         if parent_id is not None:
-            position = sum(edge.parent_id == parent_id for edge in edges)
-            edges = (*edges, ParentEdge(parent_id=parent_id, child_id=entry.id, position=position))
+            edges = edges.union((ParentEdge(parent_id=parent_id, child_id=entry.id),))
 
-        return type(self)(_entries=(*self._entries, entry), _edges=edges), entry
+        return type(self)(_entries=self._entries.union((entry,)), _edges=edges), entry
 
     def _reject_reference_conflict(self, reference: EntryReference) -> None:
         for entry in self._entries:

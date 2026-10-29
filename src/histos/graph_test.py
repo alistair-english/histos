@@ -44,10 +44,12 @@ def test_entries_can_be_parented_by_id_or_reference() -> None:
 
     snapshot = graph.snapshot()
 
-    assert snapshot.entries == (root, first_child, second_child)
-    assert snapshot.edges == (
-        ParentEdge(parent_id=root.id, child_id=first_child.id, position=0),
-        ParentEdge(parent_id=root.id, child_id=second_child.id, position=1),
+    assert snapshot.entries == frozenset((root, first_child, second_child))
+    assert snapshot.edges == frozenset(
+        (
+            ParentEdge(parent_id=root.id, child_id=first_child.id),
+            ParentEdge(parent_id=root.id, child_id=second_child.id),
+        )
     )
 
 
