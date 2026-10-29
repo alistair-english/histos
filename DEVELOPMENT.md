@@ -113,6 +113,8 @@ Do not commit tests aimed only at behavior internal to a boundary. When building
 
 Committed tests must run quickly so the complete suite can run on every commit. A slow test belongs outside the pre-commit suite unless its boundary can be exercised through a faster substitute.
 
+Place committed tests beside their implementation using the `*_test.py` suffix. Test modules are development code and must be excluded from built distributions.
+
 Useful committed architecture tests include:
 
 - public types import from their intended modules;
