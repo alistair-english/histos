@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.pyright/
+.ruff_cache/
+.venv/
+dist/
+
+# Node
+node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+# Histos workspace state
+.histos/
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/

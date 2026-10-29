@@ -1,0 +1,48 @@
+[project]
+name = "histos"
+version = "0.1.0"
+description = "A local, graph-based interface for language models."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi",
+    "httpx",
+    "httpx-sse",
+    "platformdirs",
+    "portalocker",
+    "pydantic-settings",
+    "rich",
+    "sse-starlette",
+    "typer",
+    "uvicorn[standard]",
+]
+
+[dependency-groups]
+dev = [
+    "pyright",
+    "pytest",
+    "pytest-asyncio",
+    "ruff",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/histos"]
+
+[tool.pyright]
+include = ["src"]
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
+
+[tool.pytest.ini_options]
+addopts = "-q"
+asyncio_mode = "auto"
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
