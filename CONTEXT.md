@@ -8,7 +8,7 @@
 
 Histos is an experimental local web interface for language models. Its central interaction model is intended to be a directed graph rather than a conventional linear chat context.
 
-The graph may represent the current state supplied to a model, rather than a traditional conversation history. Exactly how graph state is selected, ordered, transformed into model input, and updated from model output has deliberately been deferred.
+The current initial design treats the graph as the conversation itself and as the complete durable state supplied to a model. Pressing **Respond** starts a fresh model session from the whole current graph; provider conversations and separate turn histories are not retained. This is an initial direction for prototyping, not a permanent product constraint.
 
 This is currently a personal/local project. Easy iteration matters more than polished cross-platform distribution.
 
@@ -115,26 +115,45 @@ The Codex implementation should be native to Histos rather than importing Pi. Th
 
 OAuth credentials would probably be global rather than workspace-specific. Because the proposed process model allows multiple workspace processes, token refresh may eventually require a shared cross-process lock and atomic credential updates. This has not been implemented.
 
-## Graph-to-model boundary discussed
+## Initial graph design
 
-A simple conceptual flow was considered:
+The current graph direction is documented in
+[`docs/initial-graph-design.md`](docs/initial-graph-design.md).
 
-```text
-Graph snapshot
-    -> compile model input
-    -> stream model events
-    -> apply resulting graph changes
-```
+> **These are initial design choices for a prototype.** They are not settled
+> requirements or a permanent graph contract. Challenge and change them when
+> implementation experience or real model interactions suggest a better design.
 
-Possible interface names included:
+The current working choices are:
 
-- `GraphCompiler`
-- `ModelGateway`
-- `GraphReducer`
+- The initial “graph” is an ordered, rooted tree with one parent per entry and
+  any number of children.
+- The root is a user question.
+- Parent edges are deliberately untyped. Their meaning is inferred from entry
+  kinds and content rather than formally defined.
+- Authorship and entry kind are separate properties. The initial combinations
+  are user question, user message, agent concept, agent question, and agent
+  tool call.
+- The graph is editable current state rather than an immutable audit log,
+  although full editing is outside the first prototype.
+- A model receives the whole current tree whenever the user presses **Respond**.
+  There is no focus entry, attention/change prompt, persisted turn transcript,
+  or continued provider conversation.
+- Each response uses a fresh model session. Anything needed by a later response
+  must be represented in the graph.
+- The agent may initially add concepts, questions, and tool calls anywhere in
+  the tree, but may not edit or delete existing entries.
+- Tool calls are parented graph entries; concepts based on their results may be
+  attached beneath them.
+- Model input should be lightweight readable prose with enough stable references
+  to address parents, not a verbose database-like node dump.
+- The leading output approach is provider-native graph-writing tools rather than
+  requiring the model to print raw JSON.
 
-The useful principle was that provider code should not traverse or mutate the graph directly. A graph layer could decide what state becomes model input, while a model layer accepts a request and emits provider-neutral events.
-
-The user explicitly chose not to work on this yet. Do not treat these names or shapes as established APIs. Avoid creating elaborate graph/model abstractions until the concrete graph behavior is better understood.
+Serialization order, stable-reference format, exact graph-writing operations,
+tool-result representation, and many other details remain unresolved. Depth-
+first and breadth-first prompt order both remain candidates. Avoid creating
+elaborate graph/model abstractions until concrete behavior requires them.
 
 ## Source layout
 
