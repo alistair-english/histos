@@ -2,7 +2,7 @@
 
 Histos is an experiment in graph-based conversations with language models.
 
-The project is being rebuilt from primitives. The active repository intentionally contains no application implementation yet. Behaviors will be introduced one at a time, with their interfaces and tests, rather than by designing the complete system in advance.
+The project is being rebuilt from primitives. The active repository intentionally contains no application implementation yet. Its architecture will first be assembled piece by piece as typed, executable interface code. Concrete behavior will then be implemented against that skeleton one tested increment at a time.
 
 See [`DEVELOPMENT.md`](DEVELOPMENT.md) for the working method.
 
