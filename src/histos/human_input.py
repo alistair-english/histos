@@ -3,18 +3,19 @@
 from __future__ import annotations
 
 from histos.graph import (
+    UNCHANGED,
     Author,
     ConversationGraph,
     Entry,
     EntryId,
     EntryKind,
     EntryReference,
-    ReferenceConflictError,
+    Unchanged,
 )
 
 
 class HumanInputError(ValueError):
-    """Raised when human input cannot be added to the graph."""
+    """Raised when human input cannot be applied to the graph."""
 
 
 def add_human_entry(
@@ -45,23 +46,58 @@ def add_human_entry(
         msg = "Generating metadata for unlabeled human input is not implemented"
         raise NotImplementedError(msg)
 
-    reference_base = _slugify(label)
+    reference = _available_reference(graph, _slugify(label))
+    return graph.add_entry(
+        parent=parent_id,
+        reference=reference,
+        author=Author.USER,
+        kind=kind,
+        content=content,
+        label=label,
+    )
+
+
+def edit_entry(
+    graph: ConversationGraph,
+    *,
+    entry_id: EntryId,
+    content: str | Unchanged = UNCHANGED,
+    label: str | Unchanged | None = UNCHANGED,
+) -> tuple[ConversationGraph, Entry]:
+    """Apply human content and label edits without exposing the reference."""
+    if isinstance(content, Unchanged) and isinstance(label, Unchanged):
+        msg = "An entry edit must change content or label"
+        raise HumanInputError(msg)
+
+    reference: EntryReference | Unchanged = UNCHANGED
+    if isinstance(label, str):
+        reference = _available_reference(
+            graph,
+            _slugify(label),
+            excluding=entry_id,
+        )
+
+    return graph.update_entry(
+        entry_id=entry_id,
+        reference=reference,
+        content=content,
+        label=label,
+    )
+
+
+def _available_reference(
+    graph: ConversationGraph,
+    reference_base: str,
+    *,
+    excluding: EntryId | None = None,
+) -> EntryReference:
+    unavailable = {entry.reference for entry in graph.snapshot().entries if entry.id != excluding}
     reference = EntryReference(reference_base)
     suffix = 2
-
-    while True:
-        try:
-            return graph.add_entry(
-                parent=parent_id,
-                reference=reference,
-                author=Author.USER,
-                kind=kind,
-                content=content,
-                label=label,
-            )
-        except ReferenceConflictError:
-            reference = EntryReference(f"{reference_base}-{suffix}")
-            suffix += 1
+    while reference in unavailable:
+        reference = EntryReference(f"{reference_base}-{suffix}")
+        suffix += 1
+    return reference
 
 
 def _slugify(label: str) -> str:

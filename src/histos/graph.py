@@ -93,6 +93,10 @@ class UnknownParentError(GraphError):
     """Raised when a requested parent is absent from the graph."""
 
 
+class UnknownEntryError(GraphError):
+    """Raised when a requested entry is absent from the graph."""
+
+
 class ReferenceConflictError(GraphError):
     """Raised when an entry reference is already in use."""
 
@@ -106,6 +110,15 @@ class ReferenceConflictError(GraphError):
 type EntryLocator = EntryId | EntryReference
 
 
+class Unchanged:
+    """Mark an entry field as omitted from a partial update."""
+
+    __slots__ = ()
+
+
+UNCHANGED = Unchanged()
+
+
 @dataclass(frozen=True)
 class ConversationGraph:
     """An empty or rooted conversation graph."""
@@ -116,6 +129,16 @@ class ConversationGraph:
     def snapshot(self) -> GraphSnapshot:
         """Return the entries and parent edges for projection by a boundary."""
         return GraphSnapshot(entries=self._entries, edges=self._edges)
+
+    def get_entry(self, locator: EntryLocator) -> Entry:
+        """Return an entry selected by its internal ID or semantic reference."""
+        for entry in self._entries:
+            if isinstance(locator, EntryId) and entry.id == locator:
+                return entry
+            if isinstance(locator, EntryReference) and entry.reference == locator:
+                return entry
+        msg = f"Entry does not exist: {locator.value}"
+        raise UnknownEntryError(msg)
 
     def add_entry(  # noqa: PLR0913
         self,
@@ -146,9 +169,37 @@ class ConversationGraph:
 
         return type(self)(_entries=self._entries.union((entry,)), _edges=edges), entry
 
-    def _reject_reference_conflict(self, reference: EntryReference) -> None:
+    def update_entry(
+        self,
+        *,
+        entry_id: EntryId,
+        reference: EntryReference | Unchanged = UNCHANGED,
+        content: str | Unchanged = UNCHANGED,
+        label: str | Unchanged | None = UNCHANGED,
+    ) -> tuple[Self, Entry]:
+        """Apply entry overrides while preserving identity and topology."""
+        existing = self.get_entry(entry_id)
+        updated_reference = existing.reference if isinstance(reference, Unchanged) else reference
+        self._reject_reference_conflict(updated_reference, excluding=entry_id)
+        updated = Entry(
+            id=existing.id,
+            reference=updated_reference,
+            author=existing.author,
+            kind=existing.kind,
+            content=existing.content if isinstance(content, Unchanged) else content,
+            label=existing.label if isinstance(label, Unchanged) else label,
+        )
+        entries = self._entries.difference((existing,)).union((updated,))
+        return type(self)(_entries=entries, _edges=self._edges), updated
+
+    def _reject_reference_conflict(
+        self,
+        reference: EntryReference,
+        *,
+        excluding: EntryId | None = None,
+    ) -> None:
         for entry in self._entries:
-            if entry.reference == reference:
+            if entry.reference == reference and entry.id != excluding:
                 raise ReferenceConflictError(entry)
 
     def _resolve_parent(self, parent: EntryLocator | None) -> EntryId | None:
