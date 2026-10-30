@@ -24,26 +24,29 @@ def project_graph_for_model(graph: ConversationGraph) -> str:
     )
     lines: list[str] = []
 
-    def append_entry(entry: Entry, depth: int) -> None:
+    def append_entry(entry: Entry, depth: int, parent: Entry | None) -> None:
         if lines:
             lines.append("")
         heading = "#" * min(depth + 1, 6)
         title = entry.label or f"@{entry.reference.value}"
         kind = entry.kind.value.replace("_", " ")
+        metadata = f"{entry.author.value.title()} {kind} · @{entry.reference.value}"
+        if parent is not None:
+            metadata += f" · under @{parent.reference.value}"
         lines.extend(
             (
                 f"{heading} {title}",
                 "",
-                f"{entry.author.value.title()} {kind} · @{entry.reference.value}",
+                metadata,
                 "",
                 entry.content,
             )
         )
         for child in sorted(children_by_parent[entry.id], key=_reference_sort_key):
-            append_entry(child, depth + 1)
+            append_entry(child, depth + 1, entry)
 
     for root in roots:
-        append_entry(root, 0)
+        append_entry(root, 0, None)
 
     return "\n".join(lines) + "\n"
 

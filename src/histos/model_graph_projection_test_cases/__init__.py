@@ -3,8 +3,9 @@
 from collections.abc import Callable
 
 from histos.graph import ConversationGraph
-from histos.model_graph_projection_test_cases import root_question
+from histos.model_graph_projection_test_cases import branching_conversation, root_question
 
 CASES: dict[str, Callable[[], ConversationGraph]] = {
     "root_question": root_question.build_graph,
+    "branching_conversation": branching_conversation.build_graph,
 }
