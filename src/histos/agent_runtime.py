@@ -6,9 +6,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Literal
 
-_PLAINTEXT_VIOLATION_LIMIT = 2
 _AGENT_TURN_LIMIT = 32
-_PLAINTEXT_ERROR = "Protocol error: plaintext is not visible to the user. Write all useful content through graph tools."
 
 
 type JsonScalar = bool | int | float | str | None
@@ -99,8 +97,11 @@ async def run_agent(
     generate_turn: GenerateTurn,
     messages: tuple[ModelMessage, ...],
     tools: tuple[Tool, ...],
+    plaintext_violation_limit: int | None = None,
+    plaintext_feedback: str | None = None,
 ) -> None:
     """Generate turns and execute tools until a tool requests termination."""
+    plaintext_policy = _plaintext_policy(plaintext_violation_limit, plaintext_feedback)
     transcript = list(messages)
     plaintext_violations = 0
 
@@ -130,11 +131,13 @@ async def run_agent(
                 termination_requested = True
                 break
 
-        if turn.text.strip():
+        if turn.text.strip() and plaintext_policy is not None:
             plaintext_violations += 1
-            if plaintext_violations >= _PLAINTEXT_VIOLATION_LIMIT:
-                raise PlaintextViolationLimitError(_PLAINTEXT_ERROR)
-            transcript.append(TextMessage(role="user", content=_PLAINTEXT_ERROR))
+            violation_limit, feedback = plaintext_policy
+            if plaintext_violations >= violation_limit:
+                msg = f"Agent emitted plaintext {plaintext_violations} times; the configured limit is {violation_limit}"
+                raise PlaintextViolationLimitError(msg)
+            transcript.append(TextMessage(role="user", content=feedback))
             continue
 
         if termination_requested:
@@ -142,6 +145,18 @@ async def run_agent(
 
     msg = f"Agent exceeded the {_AGENT_TURN_LIMIT}-turn limit"
     raise AgentTurnLimitError(msg)
+
+
+def _plaintext_policy(limit: int | None, feedback: str | None) -> tuple[int, str] | None:
+    if limit is None:
+        return None
+    if limit < 1:
+        msg = "The plaintext violation limit must be positive"
+        raise ValueError(msg)
+    if feedback is None:
+        msg = "Plaintext feedback is required when a violation limit is configured"
+        raise ValueError(msg)
+    return limit, feedback
 
 
 def _find_tool(tools: tuple[Tool, ...], name: str) -> Tool | None:

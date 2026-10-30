@@ -19,6 +19,10 @@ from histos.agent_runtime import (
     run_agent,
 )
 
+_PLAINTEXT_FEEDBACK = (
+    "Protocol error: plaintext is not visible to the user. Write all useful content through graph tools."
+)
+
 
 def _tool(name: str, execute: ToolExecutor) -> Tool:
     return Tool(name=name, description=f"Execute {name}.", input_schema={}, execute=execute)
@@ -134,13 +138,61 @@ def test_plaintext_feedback_overrides_termination_and_allows_correction() -> Non
             generate_turn=generate_turn,
             messages=(),
             tools=(_tool("finish_response", finish_response),),
+            plaintext_violation_limit=2,
+            plaintext_feedback=_PLAINTEXT_FEEDBACK,
         )
     )
 
-    assert model_inputs[1][-1] == TextMessage(
-        role="user",
-        content=("Protocol error: plaintext is not visible to the user. Write all useful content through graph tools."),
+    assert model_inputs[1][-1] == TextMessage(role="user", content=_PLAINTEXT_FEEDBACK)
+
+
+def test_plaintext_is_not_checked_without_a_violation_limit() -> None:
+    """Plaintext does not interfere with normal tool termination by default."""
+    finish_executed = False
+
+    async def generate_turn(
+        _messages: tuple[ModelMessage, ...],
+        _tools: tuple[Tool, ...],
+    ) -> AssistantTurn:
+        return AssistantTurn(
+            text="Ordinary assistant output.",
+            tool_calls=(ToolCall(call_id="finish", name="finish", arguments={}),),
+        )
+
+    async def finish(_arguments: Mapping[str, object]) -> ToolExecution:
+        nonlocal finish_executed
+        finish_executed = True
+        return ToolExecution(output={"status": "finished"}, terminate=True)
+
+    asyncio.run(
+        run_agent(
+            generate_turn=generate_turn,
+            messages=(),
+            tools=(_tool("finish", finish),),
+        )
     )
+
+    assert finish_executed
+
+
+def test_plaintext_limit_requires_corrective_feedback() -> None:
+    """A configured violation limit must have feedback for the model."""
+
+    async def generate_turn(
+        _messages: tuple[ModelMessage, ...],
+        _tools: tuple[Tool, ...],
+    ) -> AssistantTurn:
+        return AssistantTurn()
+
+    with pytest.raises(ValueError, match="Plaintext feedback is required"):
+        asyncio.run(
+            run_agent(
+                generate_turn=generate_turn,
+                messages=(),
+                tools=(),
+                plaintext_violation_limit=2,
+            )
+        )
 
 
 def test_repeated_plaintext_raises_after_two_violations() -> None:
@@ -155,8 +207,19 @@ def test_repeated_plaintext_raises_after_two_violations() -> None:
         turns += 1
         return AssistantTurn(text="Still plaintext.")
 
-    with pytest.raises(PlaintextViolationLimitError):
-        asyncio.run(run_agent(generate_turn=generate_turn, messages=(), tools=()))
+    with pytest.raises(
+        PlaintextViolationLimitError,
+        match="Agent emitted plaintext 2 times; the configured limit is 2",
+    ):
+        asyncio.run(
+            run_agent(
+                generate_turn=generate_turn,
+                messages=(),
+                tools=(),
+                plaintext_violation_limit=2,
+                plaintext_feedback=_PLAINTEXT_FEEDBACK,
+            )
+        )
 
     assert turns == 2
 
