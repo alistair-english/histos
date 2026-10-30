@@ -7,7 +7,7 @@ class AgentGraphWritingError(ValueError):
     """Raised when an agent graph-writing operation is invalid."""
 
 
-def add_agent_entry(  # noqa: PLR0913
+def add_agent_entry(
     graph: ConversationGraph,
     *,
     parent: EntryReference,

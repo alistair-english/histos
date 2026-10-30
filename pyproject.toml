@@ -45,6 +45,8 @@ ignore = [
     "D213",
     # The repository has a LICENSE file instead of a header in every source file.
     "CPY001",
+    # Function signatures should expose the data an operation requires.
+    "PLR0913",
 ]
 
 [tool.ruff.lint.per-file-ignores]

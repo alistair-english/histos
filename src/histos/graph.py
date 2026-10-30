@@ -140,7 +140,7 @@ class ConversationGraph:
         msg = f"Entry does not exist: {locator.value}"
         raise UnknownEntryError(msg)
 
-    def add_entry(  # noqa: PLR0913
+    def add_entry(
         self,
         *,
         parent: EntryLocator | None,
