@@ -59,6 +59,10 @@ ignore = [
     # Literal expected values make small tests easier to read.
     "PLR2004",
 ]
+"**/*_test_cases/*.py" = [
+    # Small fixture builders are clearer without repetitive docstrings.
+    "D103",
+]
 
 [tool.ruff.format]
 quote-style = "double"

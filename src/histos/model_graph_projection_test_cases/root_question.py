@@ -5,7 +5,6 @@ from histos.human_graph_writing import add_human_entry
 
 
 def build_graph() -> ConversationGraph:
-    """Build the graph projected by this golden case."""
     graph, _ = add_human_entry(
         ConversationGraph(),
         parent_id=None,
