@@ -1,5 +1,21 @@
 # Development approach
 
+## Working style: dialogue-driven evolutionary architecture
+
+Histos is developed through collaborative domain modelling in small, tested, reversible code increments.
+
+The working loop is:
+
+1. Discuss one concrete domain concept or behavior.
+2. Express it as a small type, function signature, or example.
+3. Challenge its assumptions, vocabulary, responsibilities, and abstractions.
+4. Revise it until the code shape matches the product intuition.
+5. Implement the smallest useful slice.
+6. Test meaningful contracts and seams without mirroring the implementation.
+7. Run all checks, commit, and push before moving to the next slice.
+
+Architecture evolves from this dialogue rather than from a complete plan written in advance. Decisions remain reversible, abstractions require current evidence, and subjective product judgments remain with the user. The coding agent proposes concrete options, implements the selected direction, verifies it, and keeps each change reviewable.
+
 Histos is rebuilt from the prototype as an architecture expressed in code. The architecture is assembled as a sequence of small, reviewable, functional increments rather than designed completely in prose or as a behaviorless skeleton.
 
 ## Governing rule: minimum functionality, deliberate structure
