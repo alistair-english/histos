@@ -93,21 +93,29 @@ Architecture-focused code may use:
 - boundary-specific request, response, and event types;
 - dependency containers or composition function signatures;
 - exceptions that are part of a public contract;
-- `...` in interface bodies where Python requires a body.
+- `...` in interface bodies where Python requires a body;
+- explicit `NotImplementedError` branches that keep an intended interface visible while clearly identifying behavior deferred during the current development stage.
 
 Architecture-focused code should not use:
 
-- fake return values such as empty graphs or hard-coded responses;
-- `pass` or `NotImplementedError` in classes presented as usable implementations;
+- `pass` in components presented as usable implementations;
 - framework decorators merely to make the architecture look complete;
 - filesystem, network, provider, or process behavior;
 - compatibility layers copied wholesale from the prototype.
 
-If a component cannot do useful work yet, represent it as an interface rather than a pretend implementation.
+Prefer an interface when an entire component cannot do useful work yet. A partially usable component may raise `NotImplementedError` from explicitly deferred branches; its supported and deferred behavior must remain clear to callers.
+
+Fake or mock implementations may be used cautiously, but only with explicit approval from the user. They must be clearly identified and must not make incomplete behavior appear production-ready.
 
 ## Testing boundaries and seams
 
 Committed tests pin functionality and behavior at code boundaries and seams. They verify the contracts between responsibilities without coupling the suite to implementation details within those boundaries.
+
+Do not write tautological or implementation-mirroring tests. A test must not merely restate an assignment, constructor call, type declaration, deferred branch, or other fact already expressed directly by the implementation. Before committing a test, ask:
+
+> Would this test catch a meaningful contract regression that type checking would not?
+
+If the answer is no, omit the test.
 
 Do not commit tests aimed only at behavior internal to a boundary. When building new code, create ad hoc temporary tests or scripts to check that the implementation works as expected, then remove them before completing the increment.
 
