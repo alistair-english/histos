@@ -1,8 +1,22 @@
 """Project a conversation graph into model-readable Markdown."""
 
 from collections import defaultdict
+from typing import Final
 
 from histos.graph import ConversationGraph, Entry, EntryId
+
+MODEL_GRAPH_FORMAT: Final = """\
+The conversation is a rooted graph rendered as Markdown.
+
+Each entry contains:
+- A heading whose depth represents its graph depth.
+- A metadata line: `<Author> <kind> · @reference`.
+- For non-root entries: `· under @parent-reference`.
+- The entry content after the metadata line.
+
+Entries are rendered depth-first. Siblings are sorted by reference only for deterministic presentation;
+sibling order has no semantic meaning.
+"""
 
 
 def project_graph_for_model(graph: ConversationGraph) -> str:
