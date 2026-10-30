@@ -2,7 +2,7 @@
 
 Histos is an experiment in graph-based conversations with language models.
 
-The project is being rebuilt from primitives. The active repository intentionally contains no application implementation yet. Its architecture will first be assembled piece by piece as typed, executable interface code. Concrete behavior will then be implemented against that skeleton one tested increment at a time.
+The project is being rebuilt from primitives as small, tested functional increments. The active implementation includes the conversation graph, ephemeral agent runtime, graph-response composition, Codex authentication, and a native Codex model-turn adapter.
 
 See [`DEVELOPMENT.md`](DEVELOPMENT.md) for the working method.
 
@@ -32,6 +32,16 @@ Requirements:
 uv sync
 uv run pre-commit install
 ```
+
+## Codex login
+
+Sign in with the ChatGPT account that has your Codex subscription:
+
+```bash
+uv run histos login
+```
+
+Credentials are stored globally in `$XDG_CONFIG_HOME/histos/credentials.json`, or `~/.config/histos/credentials.json` when `XDG_CONFIG_HOME` is unset. The file is created with user-only permissions and is never stored in conversation state.
 
 ## Checks
 

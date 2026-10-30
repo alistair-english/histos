@@ -84,6 +84,10 @@ class AgentRuntimeError(RuntimeError):
     """Base class for failures of an agent run."""
 
 
+class ModelGenerationError(AgentRuntimeError):
+    """Raised when a model provider cannot generate a completed turn."""
+
+
 class PlaintextViolationLimitError(AgentRuntimeError):
     """Raised when a model repeatedly emits forbidden plaintext."""
 
