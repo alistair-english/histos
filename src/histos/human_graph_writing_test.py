@@ -1,9 +1,13 @@
-"""Boundary behavior for adding human input."""
+"""Boundary behavior for human graph writing."""
 
 import pytest
 
 from histos.graph import Author, ConversationGraph, EntryKind, EntryReference, ParentEdge
-from histos.human_input import HumanInputError, add_human_entry, edit_entry
+from histos.human_graph_writing import (
+    HumanGraphWritingError,
+    add_human_entry,
+    edit_entry,
+)
 
 
 def test_labeled_human_question_creates_the_root() -> None:
@@ -122,7 +126,7 @@ def test_human_can_remove_a_label_without_changing_other_entry_values() -> None:
 
 def test_human_cannot_add_an_agent_entry_kind() -> None:
     """Human insertion rejects kinds outside the current human capabilities."""
-    with pytest.raises(HumanInputError):
+    with pytest.raises(HumanGraphWritingError):
         add_human_entry(
             ConversationGraph(),
             parent_id=None,

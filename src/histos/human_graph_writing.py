@@ -1,4 +1,4 @@
-"""Application behavior for adding human input to a conversation graph."""
+"""Application behavior for human graph writing."""
 
 from __future__ import annotations
 
@@ -14,8 +14,8 @@ from histos.graph import (
 )
 
 
-class HumanInputError(ValueError):
-    """Raised when human input cannot be applied to the graph."""
+class HumanGraphWritingError(ValueError):
+    """Raised when a human graph-writing operation is invalid."""
 
 
 def add_human_entry(
@@ -34,7 +34,7 @@ def add_human_entry(
     """
     if kind not in (EntryKind.QUESTION, EntryKind.MESSAGE):
         msg = f"A human cannot add an entry of kind: {kind.value}"
-        raise HumanInputError(msg)
+        raise HumanGraphWritingError(msg)
 
     if label is None:
         # Give a small model the new content plus relevant context from `graph`,
@@ -67,7 +67,7 @@ def edit_entry(
     """Apply human content and label edits without exposing the reference."""
     if isinstance(content, Unchanged) and isinstance(label, Unchanged):
         msg = "An entry edit must change content or label"
-        raise HumanInputError(msg)
+        raise HumanGraphWritingError(msg)
 
     reference: EntryReference | Unchanged = UNCHANGED
     if isinstance(label, str):
@@ -116,5 +116,5 @@ def _slugify(label: str) -> str:
     slug = "".join(parts)
     if not slug:
         msg = "A human entry label must contain letters or numbers"
-        raise HumanInputError(msg)
+        raise HumanGraphWritingError(msg)
     return slug
