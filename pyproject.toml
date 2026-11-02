@@ -4,13 +4,16 @@ version = "0.1.0"
 description = "A local, graph-based interface for language models."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "fastapi>=0.162.0",
+]
 
 [project.scripts]
 histos = "histos.cli:main"
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28.1",
     "pre-commit>=4.7.0",
     "pyright",
     "pytest",
