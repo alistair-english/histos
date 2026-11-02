@@ -8,6 +8,8 @@ import sys
 import webbrowser
 from typing import TYPE_CHECKING
 
+import uvicorn
+
 from histos.credentials import FileCredentialStore
 from histos.model_providers import CodexProvider
 from histos.model_providers.codex_auth import CodexAuthenticationError
@@ -16,14 +18,20 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
+def _serve() -> None:
+    uvicorn.run("histos.server:app", host="127.0.0.1", port=8000)
+
+
 def main(arguments: Sequence[str] | None = None) -> None:
     """Run a Histos command."""
     parser = argparse.ArgumentParser(prog="histos")
-    commands = parser.add_subparsers(dest="command", required=True)
+    commands = parser.add_subparsers(dest="command")
     commands.add_parser("login", help="Log in to an OpenAI Codex subscription")
     parsed = parser.parse_args(arguments)
 
-    if parsed.command == "login":
+    if parsed.command is None:
+        _serve()
+    elif parsed.command == "login":
         provider = CodexProvider(FileCredentialStore())
         try:
             asyncio.run(provider.login(_present_authorization_url))
