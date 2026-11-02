@@ -1,12 +1,16 @@
 """Boundary behavior for human graph writing."""
 
+import asyncio
+
 import pytest
 
+from histos.agent_runtime import JsonObject, TextMessage
 from histos.graph import Author, ConversationGraph, EntryKind, EntryReference, ParentEdge
 from histos.human_graph_writing import (
     HumanGraphWritingError,
     add_human_entry,
     edit_entry,
+    submit_human_entry,
 )
 
 
@@ -23,6 +27,31 @@ def test_labeled_human_question_creates_the_root() -> None:
     assert root.author is Author.USER
     assert root.reference == EntryReference("authentication-sessions")
     assert graph.snapshot().entries == frozenset((root,))
+
+
+def test_human_entry_can_use_a_reference_without_a_label() -> None:
+    """Resolved metadata can omit a label when content is suitable for display."""
+    _, root = add_human_entry(
+        ConversationGraph(),
+        parent_id=None,
+        kind=EntryKind.QUESTION,
+        content="Use SQLite?",
+        reference=EntryReference("use-sqlite"),
+    )
+
+    assert root.reference == EntryReference("use-sqlite")
+    assert root.label is None
+
+
+def test_human_entry_requires_a_label_or_reference() -> None:
+    """Insertion cannot create an entry that other graph entries cannot address."""
+    with pytest.raises(HumanGraphWritingError, match="requires a label or reference"):
+        add_human_entry(
+            ConversationGraph(),
+            parent_id=None,
+            kind=EntryKind.QUESTION,
+            content="How should this be identified?",
+        )
 
 
 def test_human_message_can_answer_an_entry() -> None:
@@ -122,6 +151,96 @@ def test_human_can_remove_a_label_without_changing_other_entry_values() -> None:
     assert edited.label is None
     assert edited.content == root.content
     assert edited.reference == root.reference
+
+
+def test_labeled_submission_bypasses_metadata_generation() -> None:
+    """Explicit human metadata does not spend a model request."""
+
+    async def unexpected_generation(
+        _messages: tuple[TextMessage, ...],
+        _schema: JsonObject,
+    ) -> JsonObject:
+        pytest.fail("Labeled submission called the model")
+
+    _, root = asyncio.run(
+        submit_human_entry(
+            ConversationGraph(),
+            parent_id=None,
+            kind=EntryKind.QUESTION,
+            content="How should metadata work?",
+            label="Metadata",
+            generate_object=unexpected_generation,
+        )
+    )
+
+    assert root.reference == EntryReference("metadata")
+    assert root.label == "Metadata"
+
+
+def test_unlabeled_submission_generates_contextual_metadata() -> None:
+    """Human content and its graph position inform structured metadata generation."""
+    graph, root = add_human_entry(
+        ConversationGraph(),
+        parent_id=None,
+        kind=EntryKind.QUESTION,
+        content="How should metadata work?",
+        label="Metadata",
+    )
+    requests: list[tuple[tuple[TextMessage, ...], JsonObject]] = []
+
+    async def generate_metadata(
+        messages: tuple[TextMessage, ...],
+        schema: JsonObject,
+    ) -> JsonObject:
+        requests.append((messages, schema))
+        return {"reference": "yes", "label": None}
+
+    _, answer = asyncio.run(
+        submit_human_entry(
+            graph,
+            parent_id=root.id,
+            kind=EntryKind.MESSAGE,
+            content="Yes.",
+            generate_object=generate_metadata,
+        )
+    )
+
+    messages, schema = requests[0]
+    assert "@metadata" in messages[1].content
+    assert "Content:\nYes." in messages[1].content
+    assert schema["required"] == ["reference", "label"]
+    assert answer.reference == EntryReference("yes")
+    assert answer.label is None
+
+
+def test_generated_reference_conflicts_are_renamed() -> None:
+    """Generated metadata uses the same deterministic conflict policy as labels."""
+    graph, root = add_human_entry(
+        ConversationGraph(),
+        parent_id=None,
+        kind=EntryKind.QUESTION,
+        content="Choose an approach.",
+        label="Approach",
+    )
+
+    async def generate_metadata(
+        _messages: tuple[TextMessage, ...],
+        _schema: JsonObject,
+    ) -> JsonObject:
+        return {"reference": "approach", "label": "Another approach"}
+
+    _, answer = asyncio.run(
+        submit_human_entry(
+            graph,
+            parent_id=root.id,
+            kind=EntryKind.MESSAGE,
+            content="Try another approach.",
+            generate_object=generate_metadata,
+        )
+    )
+
+    assert answer.reference == EntryReference("approach-2")
+    assert answer.label == "Another approach"
 
 
 def test_human_cannot_add_an_agent_entry_kind() -> None:
