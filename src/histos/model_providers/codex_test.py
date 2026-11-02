@@ -38,6 +38,7 @@ def test_codex_provider_reuses_login_and_exposes_its_models(tmp_path: Path) -> N
     assert provider.get_models() == ["gpt-6.1-sol"]
     assert presented_urls == []
     assert callable(provider.generate_turn("gpt-6.1-sol"))
+    assert callable(provider.generate_object("gpt-6.1-sol"))
 
 
 def test_codex_provider_rejects_an_unavailable_model(tmp_path: Path) -> None:
@@ -46,3 +47,5 @@ def test_codex_provider_rejects_an_unavailable_model(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="Model is not available from openai-codex"):
         provider.generate_turn("unknown-model")
+    with pytest.raises(ValueError, match="Model is not available from openai-codex"):
+        provider.generate_object("unknown-model")

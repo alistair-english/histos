@@ -2,16 +2,24 @@
 
 from collections.abc import Mapping
 
+import pytest
+
 from histos.agent_runtime import (
     AssistantTurn,
     JsonObject,
+    ModelGenerationError,
     TextMessage,
     Tool,
     ToolCall,
     ToolExecution,
     ToolResultMessage,
 )
-from histos.model_providers.codex_model import decode_codex_events, encode_codex_request
+from histos.model_providers.codex_model import (
+    decode_codex_events,
+    decode_codex_object,
+    encode_codex_object_request,
+    encode_codex_request,
+)
 
 
 def test_codex_request_contains_the_ephemeral_tool_transcript() -> None:
@@ -79,6 +87,44 @@ def test_codex_request_contains_the_ephemeral_tool_transcript() -> None:
     ]
 
 
+def test_codex_object_request_requires_the_supplied_json_schema() -> None:
+    """Structured generation uses strict schema output without agent tools."""
+    schema: JsonObject = {
+        "type": "object",
+        "properties": {"reference": {"type": "string"}},
+        "required": ["reference"],
+        "additionalProperties": False,
+    }
+
+    request = encode_codex_object_request(
+        model="codex-test-model",
+        messages=(
+            TextMessage(role="system", content="Generate entry metadata."),
+            TextMessage(role="user", content="How should this be labeled?"),
+        ),
+        schema=schema,
+    )
+
+    assert request["instructions"] == "Generate entry metadata."
+    assert request["input"] == [
+        {
+            "role": "user",
+            "content": [{"type": "input_text", "text": "How should this be labeled?"}],
+        }
+    ]
+    assert request["text"] == {
+        "format": {
+            "type": "json_schema",
+            "name": "structured_output",
+            "schema": schema,
+            "strict": True,
+        },
+        "verbosity": "low",
+    }
+    assert "tools" not in request
+    assert "tool_choice" not in request
+
+
 def test_completed_codex_events_become_an_assistant_tool_turn() -> None:
     """Streamed reasoning, text, and function calls cross the provider boundary."""
     events: tuple[JsonObject, ...] = (
@@ -114,3 +160,28 @@ def test_completed_codex_events_become_an_assistant_tool_turn() -> None:
         text="Hidden plaintext",
         reasoning="I should add a concept.",
     )
+
+
+def test_completed_codex_events_become_a_structured_object() -> None:
+    """Streamed schema-constrained text crosses the provider boundary as an object."""
+    events: tuple[JsonObject, ...] = (
+        {"type": "response.output_text.delta", "delta": '{"reference":"structured'},
+        {"type": "response.output_text.delta", "delta": '-generation","label":null}'},
+        {"type": "response.completed"},
+    )
+
+    assert decode_codex_object(events) == {
+        "reference": "structured-generation",
+        "label": None,
+    }
+
+
+def test_structured_codex_response_must_be_an_object() -> None:
+    """A provider response cannot escape the GenerateObject result contract."""
+    events: tuple[JsonObject, ...] = (
+        {"type": "response.output_text.delta", "delta": "[]"},
+        {"type": "response.completed"},
+    )
+
+    with pytest.raises(ModelGenerationError, match="not an object"):
+        decode_codex_object(events)

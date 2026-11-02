@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from histos.model_provider import ModelProvider
+from histos.model_provider import GenerateObject, ModelProvider
 from histos.model_providers.codex_auth import CodexNotLoggedInError, authorize_codex, login_codex
-from histos.model_providers.codex_model import create_codex_generate_turn
+from histos.model_providers.codex_model import create_codex_generate_object, create_codex_generate_turn
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -45,10 +45,21 @@ class CodexProvider(ModelProvider):
 
     def generate_turn(self, model: str) -> GenerateTurn:
         """Create a normalized turn generator for a supported Codex model."""
-        if model not in _MODELS:
-            msg = f"Model is not available from {self.id}: {model}"
-            raise ValueError(msg)
+        self._require_model(model)
         return create_codex_generate_turn(
             model=model,
             credential_store=self._credential_store,
         )
+
+    def generate_object(self, model: str) -> GenerateObject:
+        """Create a structured object generator for a supported Codex model."""
+        self._require_model(model)
+        return create_codex_generate_object(
+            model=model,
+            credential_store=self._credential_store,
+        )
+
+    def _require_model(self, model: str) -> None:
+        if model not in _MODELS:
+            msg = f"Model is not available from {self.id}: {model}"
+            raise ValueError(msg)

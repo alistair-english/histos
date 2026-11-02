@@ -3,13 +3,20 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from collections.abc import Callable
+from histos.agent_runtime import JsonObject, TextMessage
 
+if TYPE_CHECKING:
     from histos.agent_runtime import GenerateTurn
     from histos.credentials import CredentialStore
+
+
+type GenerateObject = Callable[
+    [tuple[TextMessage, ...], JsonObject],
+    Awaitable[JsonObject],
+]
 
 
 class ModelProvider(ABC):
@@ -39,4 +46,9 @@ class ModelProvider(ABC):
     @abstractmethod
     def generate_turn(self, model: str) -> GenerateTurn:
         """Create a normalized turn generator for one provider model."""
+        ...
+
+    @abstractmethod
+    def generate_object(self, model: str) -> GenerateObject:
+        """Create a structured object generator for one provider model."""
         ...

@@ -22,9 +22,10 @@ from histos.agent_runtime import (
 from histos.model_providers.codex_auth import CodexAuthenticationError, authorize_codex
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Callable, Iterable
 
     from histos.credentials import CredentialStore
+    from histos.model_provider import GenerateObject
     from histos.model_providers.codex_auth import CodexAuthorization
 
 _CODEX_RESPONSES_URL = "https://chatgpt.com/backend-api/codex/responses"
@@ -44,13 +45,36 @@ def create_codex_generate_turn(
         try:
             authorization = await authorize_codex(store=credential_store)
             request_body = encode_codex_request(messages=messages, tools=tools, model=model)
-            return await asyncio.to_thread(_request_codex_turn, request_body, authorization)
+            return await asyncio.to_thread(_request_codex, request_body, authorization, decode_codex_events)
         except ModelGenerationError:
             raise
         except CodexAuthenticationError as error:
             raise ModelGenerationError(str(error)) from error
 
     return generate_turn
+
+
+def create_codex_generate_object(
+    *,
+    model: str,
+    credential_store: CredentialStore | None = None,
+) -> GenerateObject:
+    """Create a structured object generator for one Codex model."""
+
+    async def generate_object(
+        messages: tuple[TextMessage, ...],
+        schema: JsonObject,
+    ) -> JsonObject:
+        try:
+            authorization = await authorize_codex(store=credential_store)
+            request_body = encode_codex_object_request(messages=messages, schema=schema, model=model)
+            return await asyncio.to_thread(_request_codex, request_body, authorization, decode_codex_object)
+        except ModelGenerationError:
+            raise
+        except CodexAuthenticationError as error:
+            raise ModelGenerationError(str(error)) from error
+
+    return generate_object
 
 
 def encode_codex_request(
@@ -60,6 +84,45 @@ def encode_codex_request(
     model: str,
 ) -> JsonObject:
     """Translate the normalized runtime transcript into a Codex Responses request."""
+    request = _encode_codex_request_base(messages=messages, model=model)
+    request["tool_choice"] = "auto"
+    request["parallel_tool_calls"] = True
+    if tools:
+        encoded_tools: list[JsonValue] = [
+            {
+                "type": "function",
+                "name": tool.name,
+                "description": tool.description,
+                "parameters": tool.input_schema,
+                "strict": False,
+            }
+            for tool in tools
+        ]
+        request["tools"] = encoded_tools
+    return request
+
+
+def encode_codex_object_request(
+    *,
+    messages: tuple[TextMessage, ...],
+    schema: JsonObject,
+    model: str,
+) -> JsonObject:
+    """Translate a structured generation request into a Codex Responses request."""
+    request = _encode_codex_request_base(messages=messages, model=model)
+    request["text"] = {
+        "format": {
+            "type": "json_schema",
+            "name": "structured_output",
+            "schema": schema,
+            "strict": True,
+        },
+        "verbosity": "low",
+    }
+    return request
+
+
+def _encode_codex_request_base(*, messages: tuple[ModelMessage, ...], model: str) -> JsonObject:
     instructions: list[str] = []
     inputs: list[JsonValue] = []
 
@@ -101,7 +164,7 @@ def encode_codex_request(
                 }
             )
 
-    request: JsonObject = {
+    return {
         "model": model,
         "store": False,
         "stream": True,
@@ -109,22 +172,7 @@ def encode_codex_request(
         "input": inputs,
         "text": {"verbosity": "low"},
         "include": ["reasoning.encrypted_content"],
-        "tool_choice": "auto",
-        "parallel_tool_calls": True,
     }
-    if tools:
-        encoded_tools: list[JsonValue] = [
-            {
-                "type": "function",
-                "name": tool.name,
-                "description": tool.description,
-                "parameters": tool.input_schema,
-                "strict": False,
-            }
-            for tool in tools
-        ]
-        request["tools"] = encoded_tools
-    return request
 
 
 def decode_codex_events(events: Iterable[JsonObject]) -> AssistantTurn:
@@ -208,7 +256,25 @@ def _event_error(event: JsonObject) -> str:
     return f"Codex generation failed with event: {event.get('type')}"
 
 
-def _request_codex_turn(body: JsonObject, authorization: CodexAuthorization) -> AssistantTurn:
+def decode_codex_object(events: Iterable[JsonObject]) -> JsonObject:
+    """Decode one completed Codex event sequence as a JSON object."""
+    turn = decode_codex_events(events)
+    try:
+        value: object = json.loads(turn.text)
+    except json.JSONDecodeError as error:
+        msg = f"Codex returned invalid structured JSON: {error}"
+        raise ModelGenerationError(msg) from error
+    if not isinstance(value, dict):
+        msg = "Codex returned structured JSON that is not an object"
+        raise ModelGenerationError(msg)
+    return cast("JsonObject", value)
+
+
+def _request_codex[Result](
+    body: JsonObject,
+    authorization: CodexAuthorization,
+    decode: Callable[[Iterable[JsonObject]], Result],
+) -> Result:
     request = Request(
         _CODEX_RESPONSES_URL,
         data=json.dumps(body, separators=(",", ":")).encode(),
@@ -225,7 +291,7 @@ def _request_codex_turn(body: JsonObject, authorization: CodexAuthorization) -> 
     )
     try:
         with urlopen(request, timeout=120) as response:  # noqa: S310 - fixed Codex HTTPS endpoint
-            return decode_codex_events(_read_sse_events(response))
+            return decode(_read_sse_events(response))
     except HTTPError as error:
         detail = error.read().decode(errors="replace")
         msg = f"Codex request failed ({error.code}): {detail}"
