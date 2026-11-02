@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 from uuid import UUID  # noqa: TC003 - Pydantic resolves this annotation at runtime
 
 from fastapi import FastAPI, HTTPException, status
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
 from histos.agent_runtime import ModelGenerationError
@@ -59,8 +61,12 @@ class GraphResponse(BaseModel):
     edges: tuple[EdgeResponse, ...]
 
 
-def create_app(*, generate_object: GenerateObject | None = None) -> FastAPI:
-    """Create a local API with one process-lifetime conversation graph."""
+def create_app(
+    *,
+    generate_object: GenerateObject | None = None,
+    frontend_directory: Path | None = None,
+) -> FastAPI:
+    """Create a local app with one process-lifetime conversation graph."""
     object_generator = _default_generate_object() if generate_object is None else generate_object
     current_graph = ConversationGraph()
     write_lock = asyncio.Lock()
@@ -93,7 +99,18 @@ def create_app(*, generate_object: GenerateObject | None = None) -> FastAPI:
             current_graph = next_graph
             return _graph_response(current_graph)
 
+    _mount_frontend(api, frontend_directory or _default_frontend_directory())
     return api
+
+
+def _mount_frontend(api: FastAPI, directory: Path) -> None:
+    """Serve a built frontend without shadowing API routes."""
+    if (directory / "index.html").is_file():
+        api.mount("/", StaticFiles(directory=directory, html=True), name="frontend")
+
+
+def _default_frontend_directory() -> Path:
+    return Path(__file__).resolve().parents[2] / "frontend" / "dist"
 
 
 def _graph_response(graph: ConversationGraph) -> GraphResponse:

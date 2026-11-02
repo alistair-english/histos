@@ -2,6 +2,7 @@
 
 import asyncio
 from collections.abc import Sequence
+from pathlib import Path
 from uuid import uuid4
 
 from httpx import ASGITransport, AsyncClient
@@ -21,6 +22,23 @@ def _generate_from(results: Sequence[JsonObject]) -> GenerateObject:
         return next(remaining)
 
     return generate
+
+
+def test_built_frontend_and_api_share_one_origin(tmp_path: Path) -> None:
+    """The local app serves the browser entry point without shadowing its API."""
+    (tmp_path / "index.html").write_text("<h1>Histos</h1>")
+
+    async def exercise_app() -> None:
+        app = create_app(generate_object=_generate_from(()), frontend_directory=tmp_path)
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            frontend = await client.get("/")
+            graph = await client.get("/api/graph")
+
+        assert frontend.status_code == 200
+        assert frontend.text == "<h1>Histos</h1>"
+        assert graph.json() == {"entries": [], "edges": []}
+
+    asyncio.run(exercise_app())
 
 
 def test_graph_state_is_empty_and_scoped_to_one_app() -> None:

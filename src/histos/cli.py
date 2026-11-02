@@ -5,7 +5,9 @@ from __future__ import annotations
 import argparse
 import asyncio
 import sys
+import time
 import webbrowser
+from threading import Thread
 from typing import TYPE_CHECKING
 
 import uvicorn
@@ -18,8 +20,21 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
+_LOCAL_URL = "http://127.0.0.1:8000"
+
+
 def _serve() -> None:
-    uvicorn.run("histos.server:app", host="127.0.0.1", port=8000)
+    config = uvicorn.Config("histos.server:app", host="127.0.0.1", port=8000)
+    server = uvicorn.Server(config)
+    Thread(target=_open_browser_when_ready, args=(server,), daemon=True).start()
+    server.run()
+
+
+def _open_browser_when_ready(server: uvicorn.Server) -> None:
+    while not server.started and not server.should_exit:
+        time.sleep(0.05)
+    if server.started:
+        webbrowser.open(_LOCAL_URL)
 
 
 def main(arguments: Sequence[str] | None = None) -> None:

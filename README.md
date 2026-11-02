@@ -27,11 +27,22 @@ Requirements:
 
 - Python 3.12
 - [uv](https://docs.astral.sh/uv/)
+- Node.js 22 or newer
 
 ```bash
 uv sync
+npm install --prefix frontend
+npm run --prefix frontend build
 uv run pre-commit install
 ```
+
+## Run
+
+```bash
+uv run histos
+```
+
+Histos serves the API and built frontend at `http://127.0.0.1:8000` and opens it in the default browser.
 
 ## Codex login
 

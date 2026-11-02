@@ -27,3 +27,10 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
+
+      - id: frontend
+        name: Frontend checks
+        entry: npm --prefix frontend run verify
+        language: system
+        pass_filenames: false
+        always_run: true
