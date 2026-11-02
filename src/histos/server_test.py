@@ -5,9 +5,19 @@ from collections.abc import Sequence
 from pathlib import Path
 from uuid import uuid4
 
+from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
-from histos.agent_runtime import JsonObject, ModelGenerationError, TextMessage
+from histos.agent_runtime import (
+    AssistantTurn,
+    GenerateTurn,
+    JsonObject,
+    ModelGenerationError,
+    ModelMessage,
+    TextMessage,
+    Tool,
+    ToolCall,
+)
 from histos.model_provider import GenerateObject
 from histos.server import create_app
 
@@ -24,12 +34,33 @@ def _generate_from(results: Sequence[JsonObject]) -> GenerateObject:
     return generate
 
 
+async def _unexpected_turn(
+    _messages: tuple[ModelMessage, ...],
+    _tools: tuple[Tool, ...],
+) -> AssistantTurn:
+    msg = "Agent generation was not expected"
+    raise AssertionError(msg)
+
+
+def _test_app(
+    generate_object: GenerateObject,
+    *,
+    generate_turn: GenerateTurn = _unexpected_turn,
+    frontend_directory: Path | None = None,
+) -> FastAPI:
+    return create_app(
+        generate_object=generate_object,
+        generate_turn=generate_turn,
+        frontend_directory=frontend_directory,
+    )
+
+
 def test_built_frontend_and_api_share_one_origin(tmp_path: Path) -> None:
     """The local app serves the browser entry point without shadowing its API."""
     (tmp_path / "index.html").write_text("<h1>Histos</h1>")
 
     async def exercise_app() -> None:
-        app = create_app(generate_object=_generate_from(()), frontend_directory=tmp_path)
+        app = _test_app(_generate_from(()), frontend_directory=tmp_path)
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             frontend = await client.get("/")
             graph = await client.get("/api/graph")
@@ -46,8 +77,8 @@ def test_graph_state_is_empty_and_scoped_to_one_app() -> None:
 
     async def exercise_api() -> None:
         generate = _generate_from(({"reference": "root", "label": None},))
-        first_app = create_app(generate_object=generate)
-        second_app = create_app(generate_object=generate)
+        first_app = _test_app(generate)
+        second_app = _test_app(generate)
         async with (
             AsyncClient(transport=ASGITransport(app=first_app), base_url="http://test") as first,
             AsyncClient(transport=ASGITransport(app=second_app), base_url="http://test") as second,
@@ -69,8 +100,8 @@ def test_entries_and_edges_cross_the_api_without_semantic_references() -> None:
     """The browser receives complete graph topology but not model-facing references."""
 
     async def exercise_api() -> None:
-        app = create_app(
-            generate_object=_generate_from(
+        app = _test_app(
+            _generate_from(
                 (
                     {"reference": "persistence", "label": "Persistence"},
                     {"reference": "use-sqlite", "label": None},
@@ -100,6 +131,56 @@ def test_entries_and_edges_cross_the_api_without_semantic_references() -> None:
     asyncio.run(exercise_api())
 
 
+def test_agent_response_extends_the_graph_and_crosses_the_api() -> None:
+    """One browser request publishes the complete graph produced by an agent run."""
+    turns = iter(
+        (
+            AssistantTurn(
+                tool_calls=(
+                    ToolCall(
+                        call_id="addition",
+                        name="add_concept",
+                        arguments={
+                            "parent": "root",
+                            "reference": "agent-answer",
+                            "content": "The agent extends the graph.",
+                            "label": "Agent answer",
+                        },
+                    ),
+                )
+            ),
+            AssistantTurn(tool_calls=(ToolCall(call_id="finish", name="finish_response", arguments={}),)),
+        )
+    )
+
+    async def generate_turn(
+        _messages: tuple[ModelMessage, ...],
+        _tools: tuple[Tool, ...],
+    ) -> AssistantTurn:
+        return next(turns)
+
+    async def exercise_api() -> None:
+        app = _test_app(
+            _generate_from(({"reference": "root", "label": None},)),
+            generate_turn=generate_turn,
+        )
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            await client.post(
+                "/api/entries",
+                json={"parent_id": None, "kind": "question", "content": "Can an agent respond?"},
+            )
+            response = await client.post("/api/respond")
+            body = response.json()
+
+            assert response.status_code == 200
+            assert body["error"] is None
+            assert {entry["author"] for entry in body["graph"]["entries"]} == {"user", "agent"}
+            assert len(body["graph"]["edges"]) == 1
+            assert (await client.get("/api/graph")).json() == body["graph"]
+
+    asyncio.run(exercise_api())
+
+
 def test_invalid_browser_input_is_rejected_before_generation() -> None:
     """Malformed IDs, unsupported kinds, and blank content do not reach the model."""
     calls = 0
@@ -113,7 +194,7 @@ def test_invalid_browser_input_is_rejected_before_generation() -> None:
         return {"reference": "unused", "label": None}
 
     async def exercise_api() -> None:
-        app = create_app(generate_object=generate)
+        app = _test_app(generate)
         invalid_requests = (
             {"parent_id": "not-a-uuid", "kind": "message", "content": "Content"},
             {"parent_id": None, "kind": "concept", "content": "Content"},
@@ -140,7 +221,7 @@ def test_model_failure_preserves_the_current_graph() -> None:
         raise ModelGenerationError(msg)
 
     async def exercise_api() -> None:
-        app = create_app(generate_object=fail_generation)
+        app = _test_app(fail_generation)
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.post(
                 "/api/entries",
@@ -168,7 +249,7 @@ def test_concurrent_submissions_do_not_overwrite_each_other() -> None:
         return {"reference": f"entry-{calls}", "label": None}
 
     async def exercise_api() -> None:
-        app = create_app(generate_object=generate)
+        app = _test_app(generate)
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             root_response = await client.post(
                 "/api/entries",

@@ -11,6 +11,7 @@ from fastapi import FastAPI, HTTPException, status
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
+from histos.agent_graph_response import respond_to_graph
 from histos.agent_runtime import ModelGenerationError
 from histos.credentials import FileCredentialStore
 from histos.graph import Author, ConversationGraph, EntryId, EntryKind, GraphError
@@ -18,6 +19,7 @@ from histos.human_graph_writing import HumanGraphWritingError, submit_human_entr
 from histos.model_providers import CodexProvider
 
 if TYPE_CHECKING:
+    from histos.agent_runtime import GenerateTurn
     from histos.model_provider import GenerateObject
 
 
@@ -61,13 +63,23 @@ class GraphResponse(BaseModel):
     edges: tuple[EdgeResponse, ...]
 
 
+class AgentResponse(BaseModel):
+    """Graph state and any expected error from one agent response."""
+
+    model_config = ConfigDict(frozen=True)
+
+    graph: GraphResponse
+    error: str | None
+
+
 def create_app(
     *,
     generate_object: GenerateObject | None = None,
+    generate_turn: GenerateTurn | None = None,
     frontend_directory: Path | None = None,
 ) -> FastAPI:
     """Create a local app with one process-lifetime conversation graph."""
-    object_generator = _default_generate_object() if generate_object is None else generate_object
+    object_generator, turn_generator = _generation_dependencies(generate_object, generate_turn)
     current_graph = ConversationGraph()
     write_lock = asyncio.Lock()
     api = FastAPI(title="Histos", version="0.1.0")
@@ -99,8 +111,35 @@ def create_app(
             current_graph = next_graph
             return _graph_response(current_graph)
 
+    @api.post("/api/respond", response_model=AgentResponse)
+    async def create_agent_response() -> AgentResponse:
+        nonlocal current_graph
+        async with write_lock:
+            try:
+                next_graph, error = await respond_to_graph(current_graph, generate_turn=turn_generator)
+            except ValueError as error:
+                raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)) from error
+
+            current_graph = next_graph
+            return AgentResponse(graph=_graph_response(current_graph), error=error)
+
     _mount_frontend(api, frontend_directory or _default_frontend_directory())
     return api
+
+
+def _generation_dependencies(
+    generate_object: GenerateObject | None,
+    generate_turn: GenerateTurn | None,
+) -> tuple[GenerateObject, GenerateTurn]:
+    if generate_object is not None and generate_turn is not None:
+        return generate_object, generate_turn
+
+    provider = CodexProvider(FileCredentialStore())
+    model = provider.get_models()[0]
+    return (
+        generate_object or provider.generate_object(model),
+        generate_turn or provider.generate_turn(model),
+    )
 
 
 def _mount_frontend(api: FastAPI, directory: Path) -> None:
@@ -130,11 +169,6 @@ def _graph_response(graph: ConversationGraph) -> GraphResponse:
         for edge in sorted(snapshot.edges, key=lambda edge: (str(edge.parent_id.value), str(edge.child_id.value)))
     )
     return GraphResponse(entries=entries, edges=edges)
-
-
-def _default_generate_object() -> GenerateObject:
-    provider = CodexProvider(FileCredentialStore())
-    return provider.generate_object(provider.get_models()[0])
 
 
 app = create_app()

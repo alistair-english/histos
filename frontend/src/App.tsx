@@ -18,7 +18,12 @@ interface ApiErrorBody {
   detail?: unknown;
 }
 
-async function requestGraph(url: string, init?: RequestInit): Promise<GraphSnapshot> {
+interface AgentResponse {
+  graph: GraphSnapshot;
+  error: string | null;
+}
+
+async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
   if (!response.ok) {
     let message = `${response.status} ${response.statusText}`;
@@ -30,7 +35,7 @@ async function requestGraph(url: string, init?: RequestInit): Promise<GraphSnaps
     }
     throw new Error(message);
   }
-  return (await response.json()) as GraphSnapshot;
+  return (await response.json()) as T;
 }
 
 function EntryNodeView({ data, selected }: NodeProps<EntryNode>) {
@@ -61,7 +66,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    void requestGraph("/api/graph").then(setGraph, (caught: unknown) => {
+    void requestJson<GraphSnapshot>("/api/graph").then(setGraph, (caught: unknown) => {
       setError(caught instanceof Error ? caught.message : String(caught));
     });
   }, []);
@@ -86,7 +91,7 @@ export function App() {
     setError(null);
     try {
       const existingIds = new Set(graph.entries.map((entry) => entry.id));
-      const nextGraph = await requestGraph("/api/entries", {
+      const nextGraph = await requestJson<GraphSnapshot>("/api/entries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -99,6 +104,20 @@ export function App() {
       setGraph(nextGraph);
       setSelectedId(createdEntry?.id ?? selectedId);
       setDraft(emptyDraft);
+    } catch (caught: unknown) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function respondToGraph() {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await requestJson<AgentResponse>("/api/respond", { method: "POST" });
+      setGraph(response.graph);
+      setError(response.error);
     } catch (caught: unknown) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
@@ -131,6 +150,15 @@ export function App() {
             <p>{selectedEntry.content}</p>
           </article>
         )}
+
+        <button
+          className="respond"
+          disabled={busy || isEmpty}
+          onClick={() => void respondToGraph()}
+          type="button"
+        >
+          Respond
+        </button>
 
         <form onSubmit={(event) => void submitEntry(event)}>
           <label>

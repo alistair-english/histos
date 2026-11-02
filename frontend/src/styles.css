@@ -36,6 +36,11 @@ body {
   white-space: pre-wrap;
 }
 
+.details > .respond {
+  display: block;
+  margin-top: 1.5rem;
+}
+
 .details form {
   display: grid;
   gap: 1rem;
