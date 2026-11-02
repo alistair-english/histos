@@ -1,10 +1,12 @@
+import { Handle, Position, ReactFlow, type NodeProps } from "@xyflow/react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
-  Handle,
-  Position,
-  ReactFlow,
-  type NodeProps,
-} from "@xyflow/react";
-import { useEffect, useMemo, useState } from "react";
+  emptyDraft,
+  overrideDraftKind,
+  updateDraftContent,
+  type EntryDraft,
+  type UserEntryKind,
+} from "./draft.ts";
 import {
   layoutGraph,
   type Entry,
@@ -12,9 +14,22 @@ import {
   type GraphSnapshot,
 } from "./graph.ts";
 
-async function loadGraph(): Promise<GraphSnapshot> {
-  const response = await fetch("/api/graph");
-  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+interface ApiErrorBody {
+  detail?: unknown;
+}
+
+async function requestGraph(url: string, init?: RequestInit): Promise<GraphSnapshot> {
+  const response = await fetch(url, init);
+  if (!response.ok) {
+    let message = `${response.status} ${response.statusText}`;
+    try {
+      const body = (await response.json()) as ApiErrorBody;
+      if (typeof body.detail === "string") message = body.detail;
+    } catch {
+      // Keep the HTTP status when the response body is not JSON.
+    }
+    throw new Error(message);
+  }
   return (await response.json()) as GraphSnapshot;
 }
 
@@ -41,10 +56,12 @@ const nodeTypes = { entry: EntryNodeView };
 export function App() {
   const [graph, setGraph] = useState<GraphSnapshot>({ entries: [], edges: [] });
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<EntryDraft>(emptyDraft);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    void loadGraph().then(setGraph, (caught: unknown) => {
+    void requestGraph("/api/graph").then(setGraph, (caught: unknown) => {
       setError(caught instanceof Error ? caught.message : String(caught));
     });
   }, []);
@@ -57,6 +74,37 @@ export function App() {
     };
   }, [graph, selectedId]);
   const selectedEntry: Entry | undefined = graph.entries.find((entry) => entry.id === selectedId);
+  const isEmpty = graph.entries.length === 0;
+  const needsParent = !isEmpty && selectedEntry === undefined;
+  const displayedKind: UserEntryKind = isEmpty ? "question" : draft.kind;
+
+  async function submitEntry(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (needsParent || !draft.content.trim()) return;
+
+    setBusy(true);
+    setError(null);
+    try {
+      const existingIds = new Set(graph.entries.map((entry) => entry.id));
+      const nextGraph = await requestGraph("/api/entries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          parent_id: isEmpty ? null : selectedId,
+          kind: displayedKind,
+          content: draft.content,
+        }),
+      });
+      const createdEntry = nextGraph.entries.find((entry) => !existingIds.has(entry.id));
+      setGraph(nextGraph);
+      setSelectedId(createdEntry?.id ?? selectedId);
+      setDraft(emptyDraft);
+    } catch (caught: unknown) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <main className="workspace">
@@ -74,7 +122,7 @@ export function App() {
       </section>
       <aside className="details">
         {selectedEntry === undefined ? (
-          <p>Select a node to read its full content.</p>
+          <p>{isEmpty ? "Create a root question to begin." : "Select a node to read it and add a child."}</p>
         ) : (
           <article>
             <small>
@@ -83,6 +131,35 @@ export function App() {
             <p>{selectedEntry.content}</p>
           </article>
         )}
+
+        <form onSubmit={(event) => void submitEntry(event)}>
+          <label>
+            Kind
+            <select
+              disabled={isEmpty || busy || needsParent}
+              value={displayedKind}
+              onChange={(event) =>
+                setDraft((current) => overrideDraftKind(current, event.target.value as UserEntryKind))
+              }
+            >
+              <option value="message">Message</option>
+              <option value="question">Question</option>
+            </select>
+          </label>
+          <label>
+            Content
+            <textarea
+              disabled={busy || needsParent}
+              rows={7}
+              value={draft.content}
+              onChange={(event) => setDraft((current) => updateDraftContent(current, event.target.value))}
+            />
+          </label>
+          <button disabled={busy || needsParent || !draft.content.trim()} type="submit">
+            {isEmpty ? "Create root" : "Add entry"}
+          </button>
+        </form>
+
         {error !== null && <p role="alert">{error}</p>}
       </aside>
     </main>
